@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { supabase } from './lib/supabaseClient';
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
 
 type Usage = {
   monthly_quota_tokens: number;
@@ -13,6 +19,102 @@ type TranslateResp = {
   translated_text: string;
   estimated_tokens: number;
   remaining_tokens: number;
+};
+
+const GOOGLE_CLIENT_ID =
+  '699759489682-emo2kip9mcso80dinpatdor4h6ohm82r.apps.googleusercontent.com';
+
+async function loadGsiScript() {
+  if (document.getElementById('google-identity-services')) return;
+
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script');
+    script.id = 'google-identity-services';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('加载 Google 登录脚本失败'));
+    document.head.appendChild(script);
+  });
+}
+
+const GoogleSignIn: React.FC<{ onError: (msg: string) => void }> = ({
+  onError,
+}) => {
+  const buttonRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function init() {
+      try {
+        await loadGsiScript();
+        if (cancelled) return;
+
+        if (!window.google?.accounts?.id) {
+          throw new Error('Google 身份服务初始化失败');
+        }
+
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async (response: any) => {
+            try {
+              const credential = response.credential;
+              if (!credential) {
+                throw new Error('未获取到 Google 凭证');
+              }
+
+              const { error } = await supabase.auth.signInWithIdToken({
+                provider: 'google',
+                token: credential,
+              });
+              if (error) throw error;
+              // 登录成功后，App 里监听到 session 变化会自动更新 UI
+            } catch (e: any) {
+              console.error('GSI 登录错误:', e);
+              onError(e.message || '登录失败，请稍后重试');
+            }
+          },
+          ux_mode: 'popup',
+          context: 'signin',
+          auto_select: true,
+          itp_support: true,
+          use_fedcm_for_prompt: false,
+        });
+
+        if (buttonRef.current) {
+          window.google.accounts.id.renderButton(buttonRef.current, {
+            type: 'standard',
+            shape: 'pill',
+            theme: 'outline',
+            text: 'signin_with',
+            size: 'large',
+            logo_alignment: 'left',
+          });
+        }
+
+        // 触发 One Tap / FedCM 提示
+        window.google.accounts.id.prompt();
+      } catch (e: any) {
+        console.error(e);
+        onError(e.message || '初始化 Google 登录失败');
+      }
+    }
+
+    init();
+
+    return () => {
+      cancelled = true;
+      try {
+        window.google?.accounts?.id?.cancel();
+      } catch {
+        // ignore
+      }
+    };
+  }, [onError]);
+
+  return <div ref={buttonRef} />;
 };
 
 const App: React.FC = () => {
@@ -49,13 +151,17 @@ const App: React.FC = () => {
 
   async function loginWithGoogle() {
     setError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    if (error) setError(error.message);
+    try {
+      await loadGsiScript();
+      if (!window.google?.accounts?.id) {
+        throw new Error('Google 身份服务初始化失败');
+      }
+      // 手动触发 FedCM / One Tap 提示作为备用方式
+      window.google.accounts.id.prompt();
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || '启动 Google 登录失败');
+    }
   }
 
   async function logout() {
@@ -125,7 +231,12 @@ const App: React.FC = () => {
             <button onClick={logout}>退出登录</button>
           </>
         ) : (
-          <button onClick={loginWithGoogle}>使用 Google 登录</button>
+          <>
+            <GoogleSignIn onError={msg => setError(msg)} />
+            <div style={{ marginTop: 8 }}>
+              <button onClick={loginWithGoogle}>如果按钮未出现，点击这里尝试登录</button>
+            </div>
+          </>
         )}
       </section>
 

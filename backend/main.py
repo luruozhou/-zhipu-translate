@@ -19,6 +19,7 @@ from typing import Optional, Tuple
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from supabase import create_client, Client
 from zai import ZhipuAiClient
@@ -125,7 +126,7 @@ app = FastAPI(title="Translation & Billing API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4000", "http://127.0.0.1:4000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -320,6 +321,15 @@ async def get_usage(user: AuthedUser = Depends(get_current_user)):
         "billing_period_start": user.billing_period_start.isoformat(),
         "remaining_tokens": user.monthly_quota_tokens - user.used_tokens_this_period,
     }
+
+
+@app.get("/google-login", response_class=FileResponse)
+def serve_google_login_page():
+    """返回独立的 google_login.html 测试页。"""
+    html_path = ROOT_DIR / "google_login.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="google_login.html 不存在")
+    return FileResponse(str(html_path), media_type="text/html")
 
 
 if __name__ == "__main__":
