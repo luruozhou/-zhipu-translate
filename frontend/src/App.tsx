@@ -233,9 +233,6 @@ const App: React.FC = () => {
         ) : (
           <>
             <GoogleSignIn onError={msg => setError(msg)} />
-            <div style={{ marginTop: 8 }}>
-              <button onClick={loginWithGoogle}>如果按钮未出现，点击这里尝试登录</button>
-            </div>
           </>
         )}
       </section>
