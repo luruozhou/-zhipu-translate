@@ -42,5 +42,3 @@ venv/
 env/
 ENV/
 
-# Config (包含敏感信息)
-config.json
