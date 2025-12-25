@@ -2,11 +2,8 @@
 共享的工具函数和配置
 """
 
-import os
-import json
 import math
 import datetime as dt
-from pathlib import Path
 from typing import Tuple
 
 import httpx
@@ -14,46 +11,13 @@ from fastapi import HTTPException
 from supabase import create_client, Client
 from zai import ZhipuAiClient
 
-
-def load_config():
-    """从项目根目录的 config.json 读取配置。"""
-    # 获取项目根目录（api 目录的上一级）
-    current_file = Path(__file__).resolve()
-    root_dir = current_file.parent.parent
-    config_path = root_dir / "config.json"
-    
-    if not config_path.exists():
-        raise RuntimeError(f"缺少 config.json 文件，请在项目根目录创建：{config_path}")
-    
-    with config_path.open("r", encoding="utf-8") as f:
-        config = json.load(f)
-    
-    return config
-
-
-def load_supabase_config():
-    """从 config.json 读取 Supabase 配置。"""
-    config = load_config()
-    supabase_url = config.get("SUPABASE_URL")
-    supabase_service_key = config.get("SUPABASE_KEY") or config.get("SUPABASE_SERVICE_KEY")
-
-    if not supabase_url or not supabase_service_key:
-        raise RuntimeError("config.json 中缺少 SUPABASE_URL / SUPABASE_KEY，请检查配置")
-
-    return supabase_url, supabase_service_key
-
-
-SUPABASE_URL, SUPABASE_SERVICE_KEY = load_supabase_config()
+# 从 config 模块导入配置
+from api.config import SUPABASE_URL, SUPABASE_SERVICE_KEY, ZHIPU_API_KEY
 
 
 def get_zhipu_client() -> ZhipuAiClient:
-    """从 config.json 读取 ZHIPU_API_KEY，并创建 ZhipuAiClient。"""
-    config = load_config()
-    api_key = config.get("ZHIPU_API_KEY")
-    if not api_key:
-        raise RuntimeError("config.json 中缺少 ZHIPU_API_KEY，请检查配置")
-
-    return ZhipuAiClient(api_key=api_key)
+    """创建 ZhipuAiClient。"""
+    return ZhipuAiClient(api_key=ZHIPU_API_KEY)
 
 
 def translate_text_sync(text: str, target_lang: str) -> Tuple[bool, str, float]:
