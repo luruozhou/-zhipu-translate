@@ -120,6 +120,7 @@ const GoogleSignIn: React.FC<{ onError: (msg: string) => void }> = ({
 const App: React.FC = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
   const [text, setText] = useState('');
   const [targetLang, setTargetLang] = useState('英文');
   const [result, setResult] = useState('');
@@ -169,16 +170,25 @@ const App: React.FC = () => {
   }
 
   async function fetchUsage() {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error || !session) return;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) {
+      setUsage(null);
+      return;
+    }
 
+    setUsageLoading(true);
+    try {
       const res = await axios.get<Usage>('/api/me/usage', {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       setUsage(res.data);
+      setError(null);
     } catch (e: any) {
-      console.error(e);
+      console.error('获取用量信息失败:', e);
+      setUsage(null);
+      // 不设置 error，因为用量信息获取失败不应该影响其他功能
+    } finally {
+      setUsageLoading(false);
     }
   }
 
@@ -237,13 +247,88 @@ const App: React.FC = () => {
         )}
       </section>
 
-      {usage && (
-        <section style={{ marginBottom: 24, border: '1px solid #eee', padding: 16 }}>
-          <h2>本月用量</h2>
-          <p>配额：{usage.monthly_quota_tokens} tokens</p>
-          <p>已用：{usage.used_tokens_this_period} tokens</p>
-          <p>剩余：{usage.remaining_tokens} tokens</p>
-          <p>周期开始：{usage.billing_period_start}</p>
+      {userEmail && (
+        <section style={{ 
+          marginBottom: 24, 
+          border: '1px solid #e0e0e0', 
+          padding: 20,
+          borderRadius: '8px',
+          backgroundColor: '#f9f9f9'
+        }}>
+          <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', color: '#1a1a1a' }}>
+            我的用量信息
+          </h2>
+          
+          {usageLoading ? (
+            <p style={{ color: '#666', margin: 0 }}>加载中...</p>
+          ) : usage ? (
+            <>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '14px', color: '#666' }}>使用进度</span>
+                  <span style={{ fontSize: '14px', fontWeight: 500, color: '#1a1a1a' }}>
+                    {((usage.used_tokens_this_period / usage.monthly_quota_tokens) * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: '24px',
+                  backgroundColor: '#e0e0e0',
+                  borderRadius: '12px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${Math.min(100, (usage.used_tokens_this_period / usage.monthly_quota_tokens) * 100)}%`,
+                    height: '100%',
+                    backgroundColor: (usage.used_tokens_this_period / usage.monthly_quota_tokens) > 0.8 
+                      ? '#ff4444' 
+                      : (usage.used_tokens_this_period / usage.monthly_quota_tokens) > 0.5 
+                        ? '#ffaa00' 
+                        : '#4CAF50',
+                    transition: 'width 0.3s ease',
+                    borderRadius: '12px'
+                  }} />
+                </div>
+              </div>
+
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                gap: '12px' 
+              }}>
+                <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '6px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>月度配额</p>
+                  <p style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>
+                    {usage.monthly_quota_tokens.toLocaleString()}
+                  </p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#999' }}>tokens</p>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '6px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>已使用</p>
+                  <p style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#ff4444' }}>
+                    {usage.used_tokens_this_period.toLocaleString()}
+                  </p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#999' }}>tokens</p>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '6px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>剩余额度</p>
+                  <p style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#4CAF50' }}>
+                    {usage.remaining_tokens.toLocaleString()}
+                  </p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#999' }}>tokens</p>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '6px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>计费周期</p>
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 500, color: '#1a1a1a' }}>
+                    {new Date(usage.billing_period_start).toLocaleDateString('zh-CN')}
+                  </p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#999' }}>开始日期</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p style={{ color: '#999', margin: 0 }}>暂无用量信息</p>
+          )}
         </section>
       )}
 
