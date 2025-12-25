@@ -1,0 +1,9 @@
+backend/
+frontend/
+__pycache__/
+*.pyc
+node_modules/
+.env.local
+.env.*.local
+config.json
+
