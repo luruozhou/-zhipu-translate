@@ -1,22 +1,40 @@
 """
-配置模块 - 优先从环境变量读取，否则使用默认值
+配置模块 - 从 .env 文件或环境变量读取配置
 """
 
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-# Supabase 配置（优先使用环境变量，否则使用默认值）
-SUPABASE_URL = os.getenv("SUPABASE_URL") or "https://bdxgeqvzvcnlsldlvnum.supabase.co"
-SUPABASE_SERVICE_KEY = (
-    os.getenv("SUPABASE_SERVICE_KEY") 
-    or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkeGdlcXZ6dmNubHNsZGx2bnVtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjQzNjQzMywiZXhwIjoyMDgyMDEyNDMzfQ.UeVqCEXnR9nprR32vscDjBY_dAgY9nw4gtmjgSR8Epk"
-)
+# 加载 .env 文件（如果存在）
+# 从项目根目录查找 .env 文件
+current_file = Path(__file__).resolve()
+root_dir = current_file.parent.parent
+env_path = root_dir / ".env"
 
-# 智谱 AI 配置（优先使用环境变量，否则使用默认值）
-ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY") or "276b6402f853cb58c5360dcf3a1dc172.rcxQP9TaFbxM39Yi"
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    # 如果项目根目录没有 .env，也尝试加载当前目录的 .env（兼容性）
+    load_dotenv()
+
+# Supabase 配置
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
+# 智谱 AI 配置
+ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY")
 
 # Supabase Anon Key（前端使用，如果需要的话）
-SUPABASE_ANON_KEY = (
-    os.getenv("SUPABASE_ANON_KEY") 
-    or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkeGdlcXZ6dmNubHNsZGx2bnVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzY0MzMsImV4cCI6MjA4MjAxMjQzM30.AetYNUKsYfye6VB3a8_zAQCaYPohvv0IyniMsORt3xM"
-)
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+
+# 验证必需的配置
+if not SUPABASE_URL:
+    raise RuntimeError("缺少 SUPABASE_URL，请在 .env 文件或环境变量中配置")
+
+if not SUPABASE_SERVICE_KEY:
+    raise RuntimeError("缺少 SUPABASE_SERVICE_KEY，请在 .env 文件或环境变量中配置")
+
+if not ZHIPU_API_KEY:
+    raise RuntimeError("缺少 ZHIPU_API_KEY，请在 .env 文件或环境变量中配置")
 
